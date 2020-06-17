@@ -2,41 +2,60 @@ import numpy as np
 import pandas as pd
 import requests, io
 import matplotlib.pyplot as plt
-from mpl_toolkits import mplot3d
+from sklearn.model_selection import train_test_split
+from ann import ANN
 
-data_url                = 'http://utdallas.edu/~rxn170130/cs4375-nn/auto-mpg.csv'
-training_testing_split  = 0.7
+data_url                = 'http://utdallas.edu/~rxn170130/4375-data/semeion.data'
+test_proportion         = 0.3
+input_dim               = 256
+output_dim              = 10
 
-def getDataset():    
-    try:
-        # get DF containing raw data
-        text_data = io.StringIO(requests.get(data_url).content.decode('utf-8'))
+# Fetch datasets, preprocess, and split into training and testing x/y datasets
+def getDatasets():
+    # get data_m containing raw data
+    text_data = io.StringIO(requests.get(data_url).content.decode('utf-8'))
 
-        df = pd.read_csv(text_data, sep=' ')
-            
+    data_m = pd.read_csv(text_data, delim_whitespace=True, header=None).to_numpy()
 
-        # split into training and testing datasets
-        split_mask = np.random.rand(len(df)) < training_testing_split
-        
-        training_x_df = df[split_mask][regressors]
+    # Split into training and testing datasets
+    train_m, test_m = train_test_split(data_m, test_size=test_proportion)
 
+    # TODO: verify these splits
+    train_x_m = train_m[:, :input_dim]
+    train_y_m = train_m[:, input_dim:]
+    test_x_m  = test_m[:, :input_dim]
+    test_y_m  = test_m[:, input_dim:]
 
-        return {
-            'training_x_df': df[split_mask][regressors],
-            'training_y_df': df[split_mask][[regressand]],
-            'testing_x_df': df[~split_mask][regressors],
-            'testing_y_df': df[~split_mask][[regressand]]
-        }
-    except:
-        print('Unable to retrieve data')
-        quit(code=1)
+    print(f'categorized as {np.nonzero(train_y_m[0])[0][0]}')
+    plt.imshow(np.reshape(train_x_m[0], (16,16)), interpolation='nearest')
+    plt.show()
+
+    return {
+        'train_x_m': train_x_m,
+        'train_y_m': train_y_m,
+        'test_x_m': test_x_m,
+        'test_y_m': test_y_m
+    }
 
 
 def main():
-    datasets = getDataSets()
+    datasets = getDatasets()
+
+    # Initialize NN instance
+    nn = ANN(
+        input_dim = input_dim,
+        hidden_dims = (3, 3),   # two hidden layers with 3 nodes each
+        output_dim = output_dim
+    )
+
+    nn.train(
+        x_m=datasets['train_x_m'],
+        y_m=datasets['train_y_m'],
+        learning_rate=0.001
+    )
 
 
 
 
-if __name == "__main__":
+if __name__ == "__main__":
     main()
