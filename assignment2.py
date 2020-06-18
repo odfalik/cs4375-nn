@@ -26,9 +26,9 @@ def getDatasets():
     test_x_m  = test_m[:, :input_dim]
     test_y_m  = test_m[:, input_dim:]
 
-    print(f'categorized as {np.nonzero(train_y_m[0])[0][0]}')
-    plt.imshow(np.reshape(train_x_m[0], (16,16)), interpolation='nearest')
-    plt.show()
+    # print(f'categorized as {np.nonzero(train_y_m[0])[0][0]}')
+    # plt.imshow(np.reshape(train_x_m[0], (16,16)), interpolation='nearest')
+    # plt.show()
 
     return {
         'train_x_m': train_x_m,
@@ -43,9 +43,8 @@ def main():
 
     # Initialize NN instance
     nn = ANN(
-        input_dim = input_dim,
-        hidden_dims = (3, 3),   # two hidden layers with 3 nodes each
-        output_dim = output_dim
+        dims=(256, 3, 3, 10),
+        activation='tanh'
     )
 
     nn.train(

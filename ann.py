@@ -1,18 +1,26 @@
 import numpy as np
-
+import activations
 
 class ANN(object):
 
-    def __init__(self, input_dim, hidden_dims, output_dim):
-        self.input_dim = input_dim
-        self.hidden_dims = hidden_dims
-        self.output_dim = output_dim
-        self.L = len(hidden_dims) + 1
-        self.W = [None] * self.L
+    def __init__(self, dims, activation):
+        self.dims = np.asarray(dims, dtype=np.ushort)   # (1, L) array of layer dimensions
+        self.L = len(self.dims)                         # number of layers
+        self.W = np.asarray([None] * self.L)            # (1, L) array of weight matrices
+        self.B = np.asarray([None] * self.L)            # (1, L) array of biases
 
-    def predict(self, x_v):
+        A = [None] * self.L 
+        for l, dim in enumerate(self.dims):
+            A[l] = np.asarray([0] * dim)
+        self.A = np.asarray(A)                          # (1, L) array of activation arrays (1, dim)
+
+        self.activation = activation                    # string containing name of activation function: sigmoid/tanh/relu
+        self.activation_f = activations.getActivationF(activation)
+        self.activation_f_derivative = activations.getActivationFDerivative(activation)
+
+
+    def predict__(self, x_v):
         W1, b1, W2, b2 = model['W1'], model['b1'], model['W2'], model['b2']
-        # Forward propagation
         z1 = x.dot(W1) + b1
         a1 = np.tanh(z1)
         z2 = a1.dot(W2) + b2
@@ -20,25 +28,33 @@ class ANN(object):
         probs = exp_scores / np.sum(exp_scores, axis=1, keepdims=True)
         return np.argmax(probs, axis=1)
 
-    def train(self, x_m, y_m, learning_rate=0.001):
-
-        # Initialize weights
-        for layer in range(self.L):
-
-            if (layer == 0):
-                new_W_m_shape = (self.hidden_dims[0], self.input_dim)
-            elif (layer < self.L - 1):
-                new_W_m_shape = (self.hidden_dims[layer], self.hidden_dims[layer-1])
+    def predict(self, x_v):
+        for l in range(self.L):
+            if (l == 0):
+                self.A[l] = 
             else:
-                new_W_m_shape = (self.output_dim, self.hidden_dims[layer-1])
+                
+        
 
-            # Suggested weight initialization technique from https://towardsdatascience.com/weight-initialization-techniques-in-neural-networks-26c649eb3b78
-            new_W_m = np.random.randn(new_W_m_shape[0], new_W_m_shape[1]) * np.sqrt( 2 / (new_W_m_shape[1] + new_W_m_shape[0]) )
-            # print(f'layer {layer} with W_m {new_W_m}')
-            self.W[layer] = new_W_m
+    def train(self, x_m, y_m, learning_rate=0.001):
+        # Weight initialization
+        for l in range(1, self.L):
+            l_dim = self.dims[l]
+            prev_l_dim = self.dims[l-1]
+            
+            # Suggested weight/bias initialization techniques from https://towardsdatascience.com/weight-initialization-techniques-in-neural-networks-26c649eb3b78
+            if (self.activation == 'sigmoid' or self.activation == 'relu'):
+                # Xavier initialization (for sigmoid and relu activations)
+                self.W[l] = np.random.randn(l_dim, prev_l_dim) * np.sqrt( 1 / prev_l_dim)
+                self.B[l] = np.random.randn(1,1) * np.sqrt(1 / prev_l_dim)
+            else:
+                # He initialization (for tanh activations)
+                self.W[l] = np.random.randn(l_dim, prev_l_dim) * np.sqrt( 2 / prev_l_dim)
+                self.B[l] = np.random.randn(1,1) * np.sqrt(2 / prev_l_dim)
 
         # Until convergence, for each training example
         for sample_idx, sample_x_v in enumerate(x_m):
+            # Forward pass
             self.predict(sample_x_v)
             
 
