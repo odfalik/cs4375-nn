@@ -50,8 +50,9 @@ def main():
     nn.train(
         x_m=datasets['train_x_m'],
         y_m=datasets['train_y_m'],
-        learning_rate=0.0005,
-        max_batch_size=5
+        learning_rate=0.0008,
+        max_batch_size=5,
+        momentum_factor=0.2
     )
 
     # nn.test(

@@ -3,18 +3,18 @@ import activations
 
 class ANN(object):
 
-    def __init__(self, dims, activation):
+    def __init__ (self, dims, activation):
         self.dims = np.asarray(dims)                    # (1, L) array of layer dimensions
         self.L = len(self.dims)                         # number of layers
-        self.W = [None] * self.L                        # (1, L) array of weight matrices which are indexed by [to_layer][to_index, from_index]
+        self.W = [0] * self.L                           # (1, L) array of weight matrices which are indexed by [to_layer][to_index, from_index]
 
-        node_template = ([None] * self.L)
+        self.node_template = ([None] * self.L)          # (1, L) jagged array. Effectively describes the shape of nodes of our network
         for l, dim in enumerate(self.dims):
-            node_template[l] = np.asarray([0] * dim)
-        self.Z = np.asarray(node_template)                          # (1, L) jagged array of net arrays         (1, dim)
-        self.A = np.asarray(node_template)                          # (1, L) jagged array of activation arrays  (1, dim)
-        self.D = np.asarray(node_template)                          # (1, L) jagged array of delta arrays       (1, dim)
-        self.B = np.asarray(node_template)                          # (1, L) jagged array of bias arrays        (1, dim)
+            self.node_template[l] = np.asarray([0] * dim)
+        self.Z = np.asarray(self.node_template)         # (1, L) jagged array of net arrays         (1, dim)
+        self.A = np.asarray(self.node_template)         # (1, L) jagged array of activation arrays  (1, dim)
+        self.D = np.asarray(self.node_template)         # (1, L) jagged array of delta arrays       (1, dim)
+        self.B = np.asarray(self.node_template)         # (1, L) jagged array of bias arrays        (1, dim)
 
         self.activation = activation                    # string containing name of activation function: sigmoid/tanh/relu
         self.activation_f = activations.getActivationF(activation)
@@ -41,17 +41,32 @@ class ANN(object):
     def getError(self, o_v, t_v):
         return np.sum(np.square(t_v - o_v)) / 2
 
-    def updateWeights(self, latest_batch_size, max_batch_size):
+    def updateWeights(self, latest_batch_size, max_batch_size, momentum_factor):
         sum_W_delta = self.W_template
-        for l in range(1, self.L):      # For each layer 
-            for batch_index in range(latest_batch_size):  # For each sample in batch
+        sum_B_delta = self.node_template
+
+        for l in range(1, self.L):                          # For each layer
+            for batch_index in range(latest_batch_size):    # For each sample in batch
                 sum_W_delta[l] = sum_W_delta[l] + self.W_delta[batch_index][l]       # Sum weight adjustments for all samples in batch **only for this layer
-            self.W[l] = self.W[l] + (sum_W_delta[l] / latest_batch_size)
+                sum_B_delta[l] = sum_B_delta[l] + self.B_delta[batch_index][l]
+
+            if hasattr(self, 'batch_W_delta'):
+                self.batch_W_delta[l] = (sum_W_delta[l] / latest_batch_size) + (momentum_factor * self.batch_W_delta[l])
+                self.batch_B_delta[l] = (sum_B_delta[l] / latest_batch_size) + (momentum_factor * self.batch_B_delta[l])
+                print(l, self.batch_B_delta[l])
+            else:
+                self.batch_W_delta = self.W_template
+                self.batch_B_delta = self.node_template
+                self.batch_W_delta[l] = (sum_W_delta[l] / latest_batch_size)
+                self.batch_B_delta[l] = (sum_B_delta[l] / latest_batch_size)
+            self.W[l] = self.W[l] + self.batch_W_delta[l]
+            self.B[l] = self.B[l] + self.batch_B_delta[l]
+            # print(self.B[l].shape)
 
         self.W_delta = [self.W_template] * max_batch_size
 
 
-    def train(self, x_m, y_m, learning_rate=0.001, max_batch_size=32):
+    def train(self, x_m, y_m, learning_rate=0.001, max_batch_size=32, momentum_factor=0.1):
         num_samples = len(x_m)
 
         # Weight initialization
@@ -69,8 +84,11 @@ class ANN(object):
                 self.W[l] = np.random.randn(l_dim, prev_l_dim) * np.sqrt(2 / prev_l_dim)
                 self.B[l] = np.random.randn(l_dim, 1) * np.sqrt(2 / prev_l_dim)
 
-            self.W_template = self.W.copy()
+            self.W_template = []
+            for l in self.W:
+                self.W_template.append(l*0)
             self.W_delta = [self.W_template] * max_batch_size
+            self.B_delta = [self.node_template] * max_batch_size
 
 
         # Until convergence
@@ -96,15 +114,16 @@ class ANN(object):
                     else:                   # Hidden layer
                         self.D[l] = ( self.activation_f_derivative(self.A[l]).reshape(-1, 1) * (self.W[l+1].T @ self.D[l+1]) ).reshape(-1, 1)
                     
-                    # save weight updates
-                    for j in range(self.dims[l]):       # foreach node j in current layer
-                        for i in range(self.dims[l - 1]):       #for each node i in upstream layer
+                    # Save weight updates
+                    for j in range(self.dims[l]):       # For each node j in current layer
+                        for i in range(self.dims[l - 1]):       # For each node i in upstream layer
                             self.W_delta[idx_in_batch][l][j,i] = learning_rate * self.D[l][j] * self.A[l-1][i]
+                            self.B_delta[idx_in_batch][l][j]   = learning_rate * self.D[l][j]
 
                 if (idx_in_batch == max_batch_size - 1):
-                    self.updateWeights(idx_in_batch + 1, max_batch_size)
+                    self.updateWeights(idx_in_batch + 1, max_batch_size, momentum_factor)
                 elif (sample_idx == num_samples - 1):
-                    self.updateWeights(idx_in_batch + 1, max_batch_size)
+                    self.updateWeights(idx_in_batch + 1, max_batch_size, momentum_factor)
 
 
             if not (epoch % 5):
