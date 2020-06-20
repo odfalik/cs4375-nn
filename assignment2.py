@@ -44,14 +44,20 @@ def main():
     # Initialize NN instance
     nn = ANN(
         dims=(256, 3, 3, 10),
-        activation='tanh'
+        activation='sigmoid'
     )
 
     nn.train(
         x_m=datasets['train_x_m'],
         y_m=datasets['train_y_m'],
-        learning_rate=0.001
+        learning_rate=0.0005,
+        max_batch_size=5
     )
+
+    # nn.test(
+    #     x_m=datasets['test_x_m'],
+    #     y_m=datasets['test_y_m']
+    # )
 
 
 
