@@ -1,36 +1,42 @@
 import numpy as np
+import matplotlib.pyplot as plt
+from copy import deepcopy
 import activations
 
 class ANN(object):
 
-    def __init__ (self, dims, activation):
+    def __init__ (self, dims, activation, plot=False):
         self.dims = np.asarray(dims)                    # (1, L) array of layer dimensions
         self.L = len(self.dims)                         # number of layers
         self.W = [0] * self.L                           # (1, L) array of weight matrices which are indexed by [to_layer][to_index, from_index]
 
         self.node_template = ([None] * self.L)          # (1, L) jagged array. Effectively describes the shape of nodes of our network
         for l, dim in enumerate(self.dims):
-            self.node_template[l] = np.asarray([0] * dim)
-        self.Z = np.asarray(self.node_template)         # (1, L) jagged array of net arrays         (1, dim)
-        self.A = np.asarray(self.node_template)         # (1, L) jagged array of activation arrays  (1, dim)
-        self.D = np.asarray(self.node_template)         # (1, L) jagged array of delta arrays       (1, dim)
-        self.B = np.asarray(self.node_template)         # (1, L) jagged array of bias arrays        (1, dim)
+            self.node_template[l] = np.asarray([0] * dim).reshape(-1,1)
+        self.Z = deepcopy(self.node_template)           # (1, L) jagged array of net arrays         (1, dim)
+        self.A = deepcopy(self.node_template)           # (1, L) jagged array of activation arrays  (1, dim)
+        self.D = deepcopy(self.node_template)           # (1, L) jagged array of delta arrays       (1, dim)
+        self.B = deepcopy(self.node_template)           # (1, L) jagged array of bias arrays        (1, dim)
 
         self.activation = activation                    # string containing name of activation function: sigmoid/tanh/relu
         self.activation_f = activations.getActivationF(activation)
         self.activation_f_derivative = activations.getActivationFDerivative(activation)
 
+        self.plot = plot
+        if self.plot:
+            self.activations_log = np.empty((1, self.dims[self.L-1]))
+
 
     def predict(self, x_v, y_v=None):
+
         for l in range(self.L):
             if (l == 0):    # Input layer
                 self.A[l] = x_v.reshape(-1, 1)
             else:           # Hidden or Output layer
-                a = self.A[l - 1]
-                x = self.W[l]
+                w = self.W[l]
+                a = self.A[l - 1].reshape(-1,1)
                 b = self.B[l]
-                weighted_sum = x @ a
-                # print(f'weights:{x.shape} * activations:{a.shape} = {weighted_sum.shape} to add with {b.shape}')
+                weighted_sum = w @ a
                 self.Z[l] = weighted_sum + b
                 self.A[l] = self.activation_f(self.Z[l])
         self.prediction = np.argmax(self.A[self.L-1])
@@ -42,28 +48,21 @@ class ANN(object):
         return np.sum(np.square(t_v - o_v)) / 2
 
     def updateWeights(self, latest_batch_size, max_batch_size, momentum_factor):
-        sum_W_delta = self.W_template
-        sum_B_delta = self.node_template
+        sum_W_delta = deepcopy(self.W_template)
+        sum_B_delta = deepcopy(self.node_template)
 
         for l in range(1, self.L):                          # For each layer
             for batch_index in range(latest_batch_size):    # For each sample in batch
                 sum_W_delta[l] = sum_W_delta[l] + self.W_delta[batch_index][l]       # Sum weight adjustments for all samples in batch **only for this layer
                 sum_B_delta[l] = sum_B_delta[l] + self.B_delta[batch_index][l]
 
-            if hasattr(self, 'batch_W_delta'):
-                self.batch_W_delta[l] = (sum_W_delta[l] / latest_batch_size) + (momentum_factor * self.batch_W_delta[l])
-                self.batch_B_delta[l] = (sum_B_delta[l] / latest_batch_size) + (momentum_factor * self.batch_B_delta[l])
-                print(l, self.batch_B_delta[l])
-            else:
-                self.batch_W_delta = self.W_template
-                self.batch_B_delta = self.node_template
-                self.batch_W_delta[l] = (sum_W_delta[l] / latest_batch_size)
-                self.batch_B_delta[l] = (sum_B_delta[l] / latest_batch_size)
+            self.batch_W_delta[l] = (sum_W_delta[l] / latest_batch_size) + (momentum_factor * self.batch_W_delta[l])
+            self.batch_B_delta[l] = (sum_B_delta[l] / latest_batch_size) + (momentum_factor * self.batch_B_delta[l])
             self.W[l] = self.W[l] + self.batch_W_delta[l]
             self.B[l] = self.B[l] + self.batch_B_delta[l]
-            # print(self.B[l].shape)
 
-        self.W_delta = [self.W_template] * max_batch_size
+        self.W_delta = [deepcopy(self.W_template)] * max_batch_size
+        self.B_delta = [deepcopy(self.node_template)] * max_batch_size
 
 
     def train(self, x_m, y_m, learning_rate=0.001, max_batch_size=32, momentum_factor=0.1):
@@ -87,8 +86,13 @@ class ANN(object):
             self.W_template = []
             for l in self.W:
                 self.W_template.append(l*0)
-            self.W_delta = [self.W_template] * max_batch_size
-            self.B_delta = [self.node_template] * max_batch_size
+            self.W_delta = [deepcopy(self.W_template)] * max_batch_size
+            self.B_delta = [deepcopy(self.node_template)] * max_batch_size
+
+        self.batch_W_delta = deepcopy(self.W_template)
+        self.batch_B_delta = deepcopy(self.node_template)
+
+        self.test(x_m, y_m)
 
 
         # Until convergence
@@ -120,13 +124,25 @@ class ANN(object):
                             self.W_delta[idx_in_batch][l][j,i] = learning_rate * self.D[l][j] * self.A[l-1][i]
                             self.B_delta[idx_in_batch][l][j]   = learning_rate * self.D[l][j]
 
+                # If last sample in batch
                 if (idx_in_batch == max_batch_size - 1):
                     self.updateWeights(idx_in_batch + 1, max_batch_size, momentum_factor)
                 elif (sample_idx == num_samples - 1):
                     self.updateWeights(idx_in_batch + 1, max_batch_size, momentum_factor)
 
+            # Shuffle dataset
+            randomize = np.arange(len(x_m))
+            np.random.shuffle(randomize)
+            x_m = x_m[randomize]
+            y_m = y_m[randomize]
 
-            if not (epoch % 5):
+
+            if not (epoch % 1):
+                if self.plot:
+                    self.activations_log = np.concatenate((self.activations_log, self.A[self.L-1].T))
+                    plt.plot(self.activations_log)
+                    plt.pause(1)
+
                 print(f'Epoch {epoch}')
                 self.test(x_m, y_m)
 
@@ -135,8 +151,10 @@ class ANN(object):
 
     def test(self, x_m, y_m):
         err_sum = 0
+        num_correct = 0
         for sample_idx, sample_x_v in enumerate(x_m):
             self.predict(sample_x_v, y_m[sample_idx])
+            if (self.prediction == self.expected):
+                num_correct += 1
             err_sum = self.getError(self.A[self.L - 1], y_m[sample_idx])
-        err_sum / len(x_m)
-        print(f'\terror: {err_sum} \t {self.prediction} {self.expected} confidence:{self.A[self.L-1][self.prediction][0]}')
+        print(f'\t cost: {err_sum / len(x_m)} accuracy: {100*num_correct/len(x_m)}% \t {self.prediction} {self.expected} confidence:{self.A[self.L-1][self.prediction][0]}')

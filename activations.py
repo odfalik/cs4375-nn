@@ -6,6 +6,9 @@ sigmoid_v = np.vectorize(sigmoid)
 
 delReluSingleVal = lambda x: (x>0)*1
 delRelu_v = np.vectorize(delReluSingleVal)
+def relu(x):
+    return x if x > 0 else 0
+relu_v = np.vectorize(relu)
 
 # Returns a lambda which calculates the derivative of the activation function for a given activation value
 def getActivationFDerivative(activation):
@@ -17,9 +20,6 @@ def getActivationFDerivative(activation):
 
     elif (activation == 'relu'):
         return lambda x: delRelu_v    # TODO double check
-    
-    # elif (activation == 'identity'):
-    #     return lambda x: np.ones((x.shape[0],1))
 
     else:
         print(f'Unsupported activation function: {activation}')
@@ -35,10 +35,7 @@ def getActivationF(activation):
         return np.tanh
 
     elif (activation == 'relu'):
-        lambda x: x if x > 0 else 0
-
-    # elif (activation == 'identity'):
-    #     return lambda x: x
+        return relu_v
 
     else:
         print(f'Unsupported activation function: {activation}')
