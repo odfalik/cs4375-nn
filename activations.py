@@ -1,25 +1,20 @@
 import numpy as np
 
-def sigmoid(x):
-    return 1/(1 + np.exp(-x))
-sigmoid_v = np.vectorize(sigmoid)
+sigmoid_s = lambda x: 1 / (1 + np.exp(-x))
+sigmoid_v = np.vectorize(sigmoid_s)
 
-delReluSingleVal = lambda x: (x>0)*1
-delRelu_v = np.vectorize(delReluSingleVal)
-def relu(x):
-    return x if x > 0 else 0
-relu_v = np.vectorize(relu)
+relu_s = lambda x: (x > 0) * 1
 
 # Returns a lambda which calculates the derivative of the activation function for a given activation value
 def getActivationFDerivative(activation):
     if (activation == 'sigmoid'):
-        return lambda x: sigmoid_v(x) * (np.ones(x.shape) - sigmoid_v(x))
+        return lambda x_v: sigmoid_v(x_v) * (np.ones(x_v.shape) - sigmoid_v(x_v))
 
     elif (activation == 'tanh'):
-        return lambda x: np.ones(x.shape[0]) - np.square(np.tanh(x))
+        return lambda x_v: np.ones(x_v.shape[0]) - np.square(np.tanh(x_v))
 
     elif (activation == 'relu'):
-        return lambda x: delRelu_v    # TODO double check
+        return np.vectorize(relu_s)
 
     else:
         print(f'Unsupported activation function: {activation}')
@@ -35,7 +30,7 @@ def getActivationF(activation):
         return np.tanh
 
     elif (activation == 'relu'):
-        return relu_v
+        return np.vectorize(lambda x: x if x > 0 else 0)
 
     else:
         print(f'Unsupported activation function: {activation}')

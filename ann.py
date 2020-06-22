@@ -23,8 +23,6 @@ class ANN(object):
         self.activation_f_derivative = activations.getActivationFDerivative(activation)
 
         self.plot = plot
-        if self.plot:
-            self.activations_log = np.empty((1, self.dims[self.L-1]))
 
 
     def predict(self, x_v, y_v=None):
@@ -65,7 +63,11 @@ class ANN(object):
         self.B_delta = [deepcopy(self.node_template)] * max_batch_size
 
 
-    def train(self, x_m, y_m, learning_rate=0.001, max_batch_size=32, momentum_factor=0.1):
+    def train(self, x_m, y_m, learning_rate=0.001, max_batch_size=32, momentum_factor=0.1, max_epochs=100):
+        if self.plot:
+            fig2, (ax_0, ax_1, ax_2, ax_3, ax_4, ax_5, ax_6, ax_7, ax_8, ax_9) = plt.subplots(10, constrained_layout=True, figsize=(8, 14))
+            self.activations_log2 = [ np.asarray( [np.zeros((10,))] * max_epochs ) ] * self.dims[self.L-1]
+
         num_samples = len(x_m)
 
         # Weight initialization
@@ -96,7 +98,9 @@ class ANN(object):
 
 
         # Until convergence
-        for epoch in range(1000):
+        for epoch in range(max_epochs):
+            num_accurate = 0
+            err_sum = 0
 
             # For each training example
             for sample_idx, sample_x_v in enumerate(x_m):
@@ -104,7 +108,15 @@ class ANN(object):
                 idx_in_batch = sample_idx % max_batch_size
 
                 # Forward pass
-                self.predict(sample_x_v)
+                self.predict(sample_x_v, y_m[sample_idx])
+                if (self.prediction == self.expected):
+                    num_accurate += 1
+                err_sum += self.getError(self.A[self.L - 1], y_m[sample_idx])
+                
+
+                # Log activations
+                if self.plot:
+                    self.activations_log2[self.expected][epoch] = self.activations_log2[self.expected][epoch] + self.A[self.L-1].reshape(-1,)
 
                 # Backpropagation
                 # Iterate layers in reverse (excluding the input layer)
@@ -112,8 +124,7 @@ class ANN(object):
 
                     # Cache delta_j (error term) which represents sensitivity of Cost to unit's activation -- will be used when computing later downstream summations                    
                     if (l == self.L-1):     # Output layer
-
-                        self.D[l] = ( (self.activation_f_derivative(self.A[l])) * (y_m[sample_idx].reshape(-1,1) - self.A[l]) ).reshape(-1, 1)
+                        self.D[l] = ( self.activation_f_derivative(self.A[l]) * (y_m[sample_idx].reshape(-1,1) - self.A[l]) ).reshape(-1, 1)
 
                     else:                   # Hidden layer
                         self.D[l] = ( self.activation_f_derivative(self.A[l]).reshape(-1, 1) * (self.W[l+1].T @ self.D[l+1]) ).reshape(-1, 1)
@@ -130,6 +141,26 @@ class ANN(object):
                 elif (sample_idx == num_samples - 1):
                     self.updateWeights(idx_in_batch + 1, max_batch_size, momentum_factor)
 
+
+
+            # At end of every epoch
+            if self.plot:
+                ax_0.imshow(self.activations_log2[0].T, cmap='bone', aspect=0.2)
+                ax_1.imshow(self.activations_log2[1].T, cmap='bone', aspect=0.2)
+                ax_2.imshow(self.activations_log2[2].T, cmap='bone', aspect=0.2)
+                ax_3.imshow(self.activations_log2[3].T, cmap='bone', aspect=0.2)
+                ax_4.imshow(self.activations_log2[4].T, cmap='bone', aspect=0.2)
+                ax_5.imshow(self.activations_log2[5].T, cmap='bone', aspect=0.2)
+                ax_6.imshow(self.activations_log2[6].T, cmap='bone', aspect=0.2)
+                ax_7.imshow(self.activations_log2[7].T, cmap='bone', aspect=0.2)
+                ax_8.imshow(self.activations_log2[8].T, cmap='bone', aspect=0.2)
+                ax_9.imshow(self.activations_log2[9].T, cmap='bone', aspect=0.2)
+                ax_9.set_xlabel('Epoch')
+                ax_0.set_title('Activations over Epochs for each number set')
+                plt.pause(10)
+
+            print(f'Epoch {epoch} Cost:{err_sum/num_samples} Accuracy:{100*num_accurate/num_samples}%')
+
             # Shuffle dataset
             randomize = np.arange(len(x_m))
             np.random.shuffle(randomize)
@@ -137,14 +168,6 @@ class ANN(object):
             y_m = y_m[randomize]
 
 
-            if not (epoch % 1):
-                if self.plot:
-                    self.activations_log = np.concatenate((self.activations_log, self.A[self.L-1].T))
-                    plt.plot(self.activations_log)
-                    plt.pause(1)
-
-                print(f'Epoch {epoch}')
-                self.test(x_m, y_m)
 
 
 
@@ -156,5 +179,5 @@ class ANN(object):
             self.predict(sample_x_v, y_m[sample_idx])
             if (self.prediction == self.expected):
                 num_correct += 1
-            err_sum = self.getError(self.A[self.L - 1], y_m[sample_idx])
-        print(f'\t cost: {err_sum / len(x_m)} accuracy: {100*num_correct/len(x_m)}% \t {self.prediction} {self.expected} confidence:{self.A[self.L-1][self.prediction][0]}')
+            err_sum += self.getError(self.A[self.L - 1], y_m[sample_idx])
+        print(f'Cost:{err_sum / len(x_m)} Accuracy:{100*num_correct/len(x_m)}%')
